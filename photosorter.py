@@ -16,40 +16,9 @@ class PhotoSorter(object):
       self._current_file_index = None
       self._filelist = None
 
-      window = gtk.Window(gtk.WINDOW_TOPLEVEL)
-      window.set_border_width(10)
-      window.connect("delete_event", gtk.main_quit)
-      window.connect("key_press_event", self.keyboard_command)
-      window.show()
-
-      vbox = gtk.VBox()
-      vbox.show()
-      window.add(vbox)
-      
-      progressbar = gtk.ProgressBar()
-      progressbar.set_fraction(0.5)
-      progressbar.set_text("15 of 1003")
-      progressbar.show()
-      vbox.add(progressbar)
-
       self.image = gtk.Image()
-      self.image.set_from_file(self._next_file())
-      self.image.show()
-      vbox.add(self.image)
+      self.progressbar = gtk.ProgressBar()
 
-      sortLabel = gtk.Label()
-      sortLabel.set_text("Was this photo taken before or after 1980?")
-      sortLabel.set_justify(gtk.JUSTIFY_CENTER)
-      sortLabel.modify_font(pango.FontDescription("sans 22"))
-      sortLabel.show()
-      vbox.pack_start(sortLabel, False, False, 0)
-
-      keyLabel = gtk.Label()
-      keyLabel.set_text("Press 1 for before, 2 for after")
-      keyLabel.set_justify(gtk.JUSTIFY_CENTER)
-      keyLabel.modify_font(pango.FontDescription("sans 18"))
-      keyLabel.show()
-      vbox.pack_start(keyLabel, False, False, 0)
 
    def _next_file(self):
       filter = lambda f: f.upper().endswith(".JPG")
@@ -87,6 +56,39 @@ class PhotoSorter(object):
 
 
    def main(self):
+      window = gtk.Window(gtk.WINDOW_TOPLEVEL)
+      window.set_border_width(10)
+      window.connect("delete_event", gtk.main_quit)
+      window.connect("key_press_event", self.keyboard_command)
+      window.show()
+
+      vbox = gtk.VBox()
+      vbox.show()
+      window.add(vbox)
+      
+      self.progressbar.set_fraction(0.5)
+      self.progressbar.set_text("15 of 1003")
+      self.progressbar.show()
+      vbox.add(self.progressbar)
+
+      self.image.set_from_file(self._next_file())
+      self.image.show()
+      vbox.add(self.image)
+
+      sortLabel = gtk.Label()
+      sortLabel.set_text("Was this photo taken before or after 1980?")
+      sortLabel.set_justify(gtk.JUSTIFY_CENTER)
+      sortLabel.modify_font(pango.FontDescription("sans 22"))
+      sortLabel.show()
+      vbox.pack_start(sortLabel, False, False, 0)
+
+      keyLabel = gtk.Label()
+      keyLabel.set_text("Press 1 for before, 2 for after")
+      keyLabel.set_justify(gtk.JUSTIFY_CENTER)
+      keyLabel.modify_font(pango.FontDescription("sans 18"))
+      keyLabel.show()
+      vbox.pack_start(keyLabel, False, False, 0)
+      
       gtk.main()
 
 
