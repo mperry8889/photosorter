@@ -103,7 +103,7 @@ class PhotoSorter(object):
 
 
       if chr(event.keyval).upper() == "Q":
-         self.quit()
+         self.quit(None, None)
 
       # resize window if necessary
       if type(widget) == gtk.Window:
