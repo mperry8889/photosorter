@@ -9,6 +9,7 @@ import gtk
 import pango
 from PIL import Image as PILImage
 import pickle
+from copy import copy
 
 
 SORT_BUCKETS = [1950, 1960, 1970, 1980, 1990, 2000]
@@ -38,11 +39,11 @@ class Bucket(object):
       # 4. unsorted. photo has not been displayed for sorting yet
       # 5. unknown. photo was displayed but relative date is unknown
       
-      self.before = []
-      self.after = []
-      self.during = []
-      self.unsorted = []
-      self.unknown = []
+      self.before = set()
+      self.after = set()
+      self.during = set()
+      self.unsorted = set()
+      self.unknown = set()
 
 
 class PhotoSorter(object):
@@ -87,7 +88,7 @@ class PhotoSorter(object):
       # photos to the sorter as well if they aren't in the system.
       if self.CURRENT_BUCKET is None:
          for bucket in self.next_bucket():
-            bucket.unsorted = self.filelist         
+            bucket.unsorted = set(self.filelist)
             break
 
 
@@ -157,9 +158,14 @@ class PhotoSorter(object):
       # intent of assigning them to other buckets.  if the bucket changes
       # in between calls, then reset the candidate file list
       while True:
-         for f in self.CURRENT_BUCKET.unsorted:
-            self.CURRENT_PHOTO = f
-            yield f
+
+         # unsorted list may change on photo sort, so copy the list and
+         # use that for generation.  if the list is changed, reset
+         # generation.
+         for f in copy(self.CURRENT_BUCKET.unsorted):
+            if f in self.CURRENT_BUCKET.unsorted:
+               self.CURRENT_PHOTO = f
+               yield f
          break
 
 
@@ -178,10 +184,10 @@ class PhotoSorter(object):
             pivot_list.append(l[0])
             return 
 
-         pivot = l[(len(l)/2)-1]
+         pivot = l[(len(l)/2)]
          pivot_list.append(pivot)
-         tree_traverse(l[0:(len(l)/2)-1], pivot_list)
-         tree_traverse(l[(len(l)/2):], pivot_list)
+         tree_traverse(l[0:(len(l)/2)], pivot_list)
+         tree_traverse(l[(len(l)/2)+1:], pivot_list)
 
       tree_traverse(sorted(self.buckets), generator_buckets)
 
@@ -191,6 +197,52 @@ class PhotoSorter(object):
 
 
    ## event handling methods
+
+   def sort_photo(self, photo, bucket, direction):
+      """Sort a photo.  Takes a photo, current bucket, and direction.
+      Direction is -1 for earlier
+                    0 for unknown
+                    1 for after
+      """
+      if direction == -1:
+         bucket.unsorted.remove(photo)
+         bucket.before.add(photo)
+
+      elif direction == 0:
+         bucket.unsorted.remove(photo)
+         bucket.unknown.add(photo)
+
+      elif direction == 1:
+         bucket.unsorted.remove(photo)
+         bucket.after.add(photo)
+
+      else:
+         raise ValueError("Invalid sort direction")
+
+      self.reconcile_buckets()
+
+
+   def reconcile_buckets(self):
+      """Reconcile all buckets.  If a bucket has "before" and "after" elements,
+      move those into the appropriate bucket.  If a photo is after and before
+      adjacent buckets, add it to the "during" list.  Kind of an expensive
+      operation and there's probably a better way to do this in-line, especially
+      since this is called on every sort operation."""
+
+      for i in range(0, len(self.buckets)-1):
+         # be careful at the beginning and end of the list
+         if i == 0:
+            self.buckets[i].unsorted |= self.buckets[i+1].before
+
+         elif i == len(self.buckets)-1:
+            self.buckets[i].unsorted |= self.buckets[i-1].after
+
+         else:
+            # prep adjacent buckets for sorting; elements before
+            # a bucket are unsorted for that prior bucket, and
+            # elements after a bucket are unsorted for that next bucket
+            self.buckets[i-1].unsorted |= self.buckets[i].before 
+            self.buckets[i+1].unsorted |= self.buckets[i].after
 
 
 
@@ -341,5 +393,4 @@ class PhotoSorterGui(object):
 if __name__ == "__main__":
    m = PhotoSorter()
    m.main()
-
 

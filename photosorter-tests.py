@@ -72,11 +72,85 @@ class TestPhotoSorter(unittest.TestCase):
       i = 0
       for b in p.next_bucket():
          if i == 0:
-            self.assertEquals(b.unsorted, p.filelist)
+            self.assertEquals(b.unsorted, set(p.filelist))
             i += 1
          else:
-            self.assertEquals(b.unsorted, [])
+            self.assertEquals(b.unsorted, set())
 
+
+   def test_basicSortDirections(self):
+      """Check basic sort directions"""
+      
+      def direction():
+         values = [-1, 0, 1, -1, 0, 1]
+         for i in values:
+            yield i
+
+      p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
+      p.buckets = [Bucket(i) for i in [1, 2, 3]]
+      photos = [1, 2, 3]
+      
+      for b in p.next_bucket():
+         b.unsorted = photos
+         break
+
+      for b in p.next_bucket():
+         d = direction()
+         for photo in p.next_photo():
+            p.sort_photo(photo, b, d.next())
+         
+         self.assertEquals(len(b.unsorted), 0)
+         self.assertEquals(len(b.before), 1)
+         self.assertEquals(len(b.after), 1)
+         self.assertEquals(len(b.unknown), 1)
+         break
+
+   def test_invalidSortDirection(self):
+      """Invalid sort direction"""
+      p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
+      p.buckets = [Bucket(i) for i in [1,2,3]]
+      photos = [1, 2, 3]
+      for b in p.next_bucket():
+         b.unsorted = photos
+         break
+
+      for b in p.next_bucket():
+         for photo in p.next_photo():
+            self.assertRaises(ValueError, p.sort_photo, photo, b, -2)
+            self.assertRaises(ValueError, p.sort_photo, photo, b, 2)
+            self.assertRaises(ValueError, p.sort_photo, photo, b, "abcd")
+            self.assertRaises(ValueError, p.sort_photo, photo, b, None)
+
+   def test_simpleReconcileBuckets(self):
+      """Simple case of sorting and reconciling buckets.  3 items, 3 buckets: 1 unknown as of bucket 2, 1 before bucket 2, 1 after bucket 2"""
+      def direction():
+         values = [-1, 0, 1, -1, 0, 1]
+         for i in values:
+            yield i
+
+      p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
+      p.buckets = [Bucket(i) for i in [1, 2, 3]]
+      photos = [1, 2, 3]
+      
+      for b in p.next_bucket():
+         b.unsorted = photos
+         break
+
+      for b in p.next_bucket():
+         d = direction()
+         for photo in p.next_photo():
+            p.sort_photo(photo, b, d.next())
+         
+         self.assertEquals(len(b.unsorted), 0)
+         self.assertEquals(len(b.before), 1)
+         self.assertEquals(len(b.after), 1)
+         self.assertEquals(len(b.unknown), 1)
+         break
+
+      p.reconcile_buckets()
+      self.assertEquals(p.buckets[1].before, p.buckets[0].unsorted)
+      self.assertEquals(p.buckets[1].after, p.buckets[2].unsorted)
+      self.assertEquals(p.buckets[1].unknown, set([2]))
 
 
 if __name__ == "__main__":
