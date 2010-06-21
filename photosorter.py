@@ -227,15 +227,24 @@ class PhotoSorter(object):
       move those into the appropriate bucket.  If a photo is after and before
       adjacent buckets, add it to the "during" list.  Kind of an expensive
       operation and there's probably a better way to do this in-line, especially
-      since this is called on every sort operation."""
+      since this is called on every sort operation.
+      
+      Subtle thing: photos can be before the 1st bucket, but can't be after the
+      last bucket.  They can only be during the last bucket, since there's no
+      upper bound to it really."""
 
-      for i in range(0, len(self.buckets)-1):
+      for i in range(0, len(self.buckets)):
          # be careful at the beginning and end of the list
          if i == 0:
             self.buckets[i].unsorted |= self.buckets[i+1].before
+            for item in self.buckets[i].after:
+               if item in self.buckets[i+1].before:
+                  self.buckets[i].during.add(item)
+                  self.buckets[i+1].before.remove(item)
 
          elif i == len(self.buckets)-1:
             self.buckets[i].unsorted |= self.buckets[i-1].after
+            self.buckets[i].during |= self.buckets[i].after
 
          else:
             # prep adjacent buckets for sorting; elements before
@@ -244,6 +253,11 @@ class PhotoSorter(object):
             self.buckets[i-1].unsorted |= self.buckets[i].before 
             self.buckets[i+1].unsorted |= self.buckets[i].after
 
+            for item in self.buckets[i].after:
+               if item in self.buckets[i+1].before:
+                  self.buckets[i].during.add(item)
+                  self.buckets[i+1].before.remove(item)
+            
 
 
 class PhotoSorterGui(object):
@@ -323,56 +337,34 @@ class PhotoSorterGui(object):
    def keyboard_command(self, widget, event):
       try:
          if chr(event.keyval).upper() == "A":
-            print self.properties
+            pass
 
          if chr(event.keyval).upper() == "B":
-            self.update_bucket()
+            pass
          
          if chr(event.keyval).upper() == "N":
-            self.image.set_from_file(self.next_file(filter=False))
+            pass
 
          if chr(event.keyval).upper() == "P":
-            self.image.set_from_file(self.prev_file(filter=False))
+            pass
 
          if chr(event.keyval) == "1":
-            self.properties[current]["sort"][bucket] = "Before"
-            next = self.next_file()
-            if next is not None:
-               self.image.set_from_file(next)
-            else:
-               self.update_bucket()
-               self.image.set_from_file(self.next_file(filter=False))
+            pass
          
          if chr(event.keyval) == "2":
-            self.properties[current]["sort"][bucket] = "After"
-            next = self.next_file()
-            if next is not None:
-               self.image.set_from_file(next)
-            else:
-               self.update_bucket()
-               self.image.set_from_file(self.next_file(filter=False))
+            pass
          
          if chr(event.keyval) == "3":
-            self.properties[current]["sort"][bucket] = "Unknown"
-            next = self.next_file()
-            if next is not None:
-               self.image.set_from_file(next)
-            else:
-               self.update_bucket()
-               self.image.set_from_file(self.next_file(filter=False))
+            pass
 
          if chr(event.keyval).upper() == "D":
-            try:
-               print self.properties[current]
-            except KeyError:
-               print "No properties for %s" % current
+            pass
 
          if chr(event.keyval).upper() == "L":
-            self.rotate_clockwise(CURRENT_IMAGE)
-
+            pass
 
          if chr(event.keyval).upper() == "H":
-            self.flip_horizontal(CURRENT_IMAGE)
+            pass
 
          if chr(event.keyval).upper() == "Q":
             self.quit(None, None)

@@ -133,7 +133,7 @@ class TestPhotoSorter(unittest.TestCase):
       photos = [1, 2, 3]
       
       for b in p.next_bucket():
-         b.unsorted = photos
+         b.unsorted = set(photos)
          break
 
       for b in p.next_bucket():
@@ -147,10 +147,56 @@ class TestPhotoSorter(unittest.TestCase):
          self.assertEquals(len(b.unknown), 1)
          break
 
-      p.reconcile_buckets()
       self.assertEquals(p.buckets[1].before, p.buckets[0].unsorted)
       self.assertEquals(p.buckets[1].after, p.buckets[2].unsorted)
       self.assertEquals(p.buckets[1].unknown, set([2]))
+
+   def test_mediumReconcileBuckets(self):
+      """More advanced case of reconciling several buckets"""
+      def direction():
+         values = [-1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1]
+         for i in values:
+            yield i
+
+      def photosByBucket(p, bucket):
+         retv = []
+         for i in p:
+            if p[i] == bucket:
+               retv.append(i)
+         return retv
+
+      p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
+      p.buckets = [Bucket(i) for i in [1, 2, 3, 4]]
+      photos = {
+      #  photo number: bucket
+         1:            3,
+         2:            2,
+         3:            4,
+         4:            2,
+         5:            1,
+         6:            4,
+         7:            1,
+         8:            4,
+         9:            4,
+      }
+      
+      for b in p.next_bucket():
+         b.unsorted = set(photos)
+         break
+
+      for b in p.next_bucket():
+         for photo in p.next_photo():
+            if photos[photo] >= int(b.name):
+               p.sort_photo(photo, b, 1)
+            elif photos[photo] < int(b.name):
+               p.sort_photo(photo, b, -1)
+            else:
+               p.sort_photo(photo, b, 0)
+      
+      for b in p.next_bucket():
+         self.assertEquals(sorted(list(b.during)), sorted(photosByBucket(photos, int(b.name))))
+
+
 
 
 if __name__ == "__main__":
