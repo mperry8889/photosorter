@@ -327,7 +327,6 @@ class PhotoSorterGui(object):
    
    
    def quit(self, widget, event):
-      self.photoSorter.dump()
       gtk.main_quit()
 
 
@@ -383,6 +382,6 @@ class PhotoSorterGui(object):
 
 
 if __name__ == "__main__":
-   m = PhotoSorter()
-   m.main()
+   g = PhotoSorterGui()
+   g.main()
 
