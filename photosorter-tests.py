@@ -67,6 +67,21 @@ class TestPhotoSorter(unittest.TestCase):
 
       self.assertEquals(photos, generated_photos)
 
+   def test_multiBucketPhotoGenerator(self):
+      """Iterate through list of potos in multiple buckets"""
+      p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
+      p.buckets = [Bucket(i) for i in range(0, 5)]
+      photos = [0, 1, 2, 3, 4]
+      generated_photos = []
+      for i in range(0, 5):
+         p.buckets[i].unsorted.add(photos[i])
+
+      for b in p.next_bucket():
+         for photo in p.next_photo():
+            generated_photos.append(photo)
+
+      self.assertEquals(sorted(generated_photos), sorted(photos))
+
    def test_primeUnsortedList(self):
       p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
       i = 0
@@ -195,7 +210,6 @@ class TestPhotoSorter(unittest.TestCase):
       
       for b in p.next_bucket():
          self.assertEquals(sorted(list(b.during)), sorted(photosByBucket(photos, int(b.name))))
-
 
 
 
