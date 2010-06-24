@@ -40,10 +40,6 @@ class TestPhotoSorter(unittest.TestCase):
 
    def test_bucketGenerator(self):
       """Iterate through the list of buckets, in sort-worthy order"""
-      class C(object):
-         def __init__(self, name):
-            self.name = "%s" % name
-
       buckets = []
       p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
       for i in p.next_bucket():
@@ -103,7 +99,7 @@ class TestPhotoSorter(unittest.TestCase):
 
       p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
       p.buckets = [Bucket(i) for i in [1, 2, 3]]
-      photos = [1, 2, 3]
+      photos = set([1, 2, 3])
       
       for b in p.next_bucket():
          b.unsorted = photos
@@ -163,6 +159,7 @@ class TestPhotoSorter(unittest.TestCase):
          break
 
       self.assertEquals(p.buckets[1].before, p.buckets[0].unsorted)
+      #self.assertEquals(p.buckets[i].before, set([]))
       self.assertEquals(p.buckets[1].after, p.buckets[2].unsorted)
       self.assertEquals(p.buckets[1].unknown, set([2]))
 
@@ -193,6 +190,11 @@ class TestPhotoSorter(unittest.TestCase):
          7:            1,
          8:            4,
          9:            4,
+         10:           1,
+         11:           2,
+         12:           3,
+         13:           4,
+         14:           1,
       }
       
       for b in p.next_bucket():
@@ -211,6 +213,16 @@ class TestPhotoSorter(unittest.TestCase):
       for b in p.next_bucket():
          self.assertEquals(sorted(list(b.during)), sorted(photosByBucket(photos, int(b.name))))
 
+      #for b in p.next_bucket():
+      #   self.assertEquals(b.unsorted, set([]))
+
+      #print "---> printing name & unsorted"
+      #for b in p.next_bucket():
+      #   print b.name, "u", b.unsorted
+      #   print b.name, "d", b.during
+      #   print b.name, "b", b.before
+      #   print b.name, "a", b.after
+      #   print "--"
 
 
 if __name__ == "__main__":
