@@ -6,6 +6,7 @@ from photosorter import Bucket
 from photosorter import SORT_BUCKETS
 
 import unittest
+import random
 
 class TestPhoto(unittest.TestCase):
    pass
@@ -47,6 +48,24 @@ class TestPhotoSorter(unittest.TestCase):
 
       self.assertEquals(sorted([i.name for i in buckets]), [i.name for i in p.buckets])
 
+   def test_imageGenerator(self):
+      """Iterate through list of unsorted images"""
+      for i in range(1, 25):
+         photos = set(range(1, i))
+
+         p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
+         for b in p.next_bucket():
+            b.unsorted = photos
+            break
+
+         generatedPhotos = []
+         for b in p.next_bucket():
+            for photo in p.next_photo():
+               generatedPhotos.append(photo)
+            break
+
+         self.assertEquals(sorted(list(photos)), sorted(generatedPhotos))
+
    def test_photoGenerator(self):
       """Iterate through list of photos in current bucket"""
       p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
@@ -79,6 +98,7 @@ class TestPhotoSorter(unittest.TestCase):
       self.assertEquals(sorted(generated_photos), sorted(photos))
 
    def test_primeUnsortedList(self):
+      """Prime an unsorted list"""
       p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
       i = 0
       for b in p.next_bucket():
@@ -91,7 +111,7 @@ class TestPhotoSorter(unittest.TestCase):
 
    def test_basicSortDirections(self):
       """Check basic sort directions"""
-      
+
       def direction():
          values = [-1, 0, 1, -1, 0, 1]
          for i in values:
@@ -100,7 +120,7 @@ class TestPhotoSorter(unittest.TestCase):
       p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
       p.buckets = [Bucket(i) for i in [1, 2, 3]]
       photos = set([1, 2, 3])
-      
+
       for b in p.next_bucket():
          b.unsorted = photos
          break
@@ -109,7 +129,8 @@ class TestPhotoSorter(unittest.TestCase):
          d = direction()
          for photo in p.next_photo():
             p.sort_photo(photo, b, d.next())
-         
+
+      for b in p.next_bucket():
          self.assertEquals(len(b.unsorted), 0)
          self.assertEquals(len(b.before), 1)
          self.assertEquals(len(b.after), 1)
@@ -135,14 +156,14 @@ class TestPhotoSorter(unittest.TestCase):
    def test_simpleReconcileBuckets(self):
       """Simple case of sorting and reconciling buckets.  3 items, 3 buckets: 1 unknown as of bucket 2, 1 before bucket 2, 1 after bucket 2"""
       def direction():
-         values = [-1, 0, 1, -1, 0, 1]
+         values = [-1, 0, 1]
          for i in values:
             yield i
 
       p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
       p.buckets = [Bucket(i) for i in [1, 2, 3]]
       photos = [1, 2, 3]
-      
+
       for b in p.next_bucket():
          b.unsorted = set(photos)
          break
@@ -151,25 +172,22 @@ class TestPhotoSorter(unittest.TestCase):
          d = direction()
          for photo in p.next_photo():
             p.sort_photo(photo, b, d.next())
-         
+
          self.assertEquals(len(b.unsorted), 0)
          self.assertEquals(len(b.before), 1)
          self.assertEquals(len(b.after), 1)
          self.assertEquals(len(b.unknown), 1)
          break
 
-      self.assertEquals(p.buckets[1].before, p.buckets[0].unsorted)
-      #self.assertEquals(p.buckets[i].before, set([]))
-      self.assertEquals(p.buckets[1].after, p.buckets[2].unsorted)
-      self.assertEquals(p.buckets[1].unknown, set([2]))
+      buckets = []
+      PhotoSorter._tree_traverse(p.buckets, buckets)
+
+      self.assertEquals(buckets[0].before, buckets[1].unsorted)
+      self.assertEquals(buckets[0].after, buckets[2].unsorted)
+      self.assertEquals(buckets[0].unknown, set([2]))
 
    def test_mediumReconcileBuckets(self):
       """More advanced case of reconciling several buckets"""
-      def direction():
-         values = [-1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1, -1, 0, 1]
-         for i in values:
-            yield i
-
       def photosByBucket(p, bucket):
          retv = []
          for i in p:
@@ -180,23 +198,23 @@ class TestPhotoSorter(unittest.TestCase):
       p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
       p.buckets = [Bucket(i) for i in [1, 2, 3, 4]]
       photos = {
-      #  photo number: bucket
-         1:            3,
-         2:            2,
-         3:            4,
-         4:            2,
-         5:            1,
-         6:            4,
-         7:            1,
-         8:            4,
-         9:            4,
-         10:           1,
-         11:           2,
-         12:           3,
-         13:           4,
-         14:           1,
-      }
-      
+      #     photo number: bucket
+            1:            3,
+            2:            2,
+            3:            4,
+            4:            2,
+            5:            1,
+            6:            4,
+            7:            1,
+            8:            4,
+            9:            4,
+            10:           1,
+            11:           2,
+            12:           3,
+            13:           4,
+            14:           1,
+            }
+
       for b in p.next_bucket():
          b.unsorted = set(photos)
          break
@@ -209,20 +227,93 @@ class TestPhotoSorter(unittest.TestCase):
                p.sort_photo(photo, b, -1)
             else:
                p.sort_photo(photo, b, 0)
-      
+
       for b in p.next_bucket():
          self.assertEquals(sorted(list(b.during)), sorted(photosByBucket(photos, int(b.name))))
+         self.assertEquals(b.unsorted, set([]))
 
-      #for b in p.next_bucket():
-      #   self.assertEquals(b.unsorted, set([]))
+   def test_skipReconcileBuckets(self):
+      """Sort, skipping a bucket"""
+      def photosByBucket(p, bucket):
+         retv = []
+         for i in p:
+            if p[i] == bucket:
+               retv.append(i)
+         return retv
 
-      #print "---> printing name & unsorted"
-      #for b in p.next_bucket():
-      #   print b.name, "u", b.unsorted
-      #   print b.name, "d", b.during
-      #   print b.name, "b", b.before
-      #   print b.name, "a", b.after
-      #   print "--"
+      p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
+      p.buckets = [Bucket(i) for i in [1, 2, 3, 4]]
+      photos = {
+      #     photo number: bucket
+            1:            1,
+            2:            2,
+            3:            4,
+            4:            2,
+            5:            1,
+            6:            4,
+            7:            1,
+            8:            4,
+            9:            4,
+            10:           1,
+            11:           2,
+            12:           1,
+            13:           4,
+            14:           1,
+            }
+
+      for b in p.next_bucket():
+         b.unsorted = set(photos)
+         break
+
+      for b in p.next_bucket():
+         for photo in p.next_photo():
+            if photos[photo] >= int(b.name):
+               p.sort_photo(photo, b, 1)
+            elif photos[photo] < int(b.name):
+               p.sort_photo(photo, b, -1)
+            else:
+               p.sort_photo(photo, b, 0)
+
+      for b in p.next_bucket():
+         self.assertEquals(sorted(list(b.during)), sorted(photosByBucket(photos, int(b.name))))
+         self.assertEquals(b.unsorted, set([]))
+
+   def test_incrementalSort(self):
+      random.seed(1)
+      """Incremental bucket/photo numbers"""
+      def photosByBucket(p, bucket):
+         retv = []
+         for i in p:
+            if p[i] == bucket:
+               retv.append(i)
+         return retv
+
+      for numBuckets in range(2, 25):
+         for numPhotos in range(1, numBuckets+25):
+
+            p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
+            p.buckets = [Bucket(i) for i in [j for j in range(1, numBuckets+1)]]
+
+            photos = {}
+            for i in range(1, numPhotos+1):
+               photos[i] = min(i, numBuckets)#random.randint(1, numBuckets)
+
+            for b in p.next_bucket():
+               b.unsorted = set(photos)
+               break
+
+            for b in p.next_bucket():
+               for photo in p.next_photo():
+                  if photos[photo] >= int(b.name):
+                     p.sort_photo(photo, b, 1)
+                  elif photos[photo] < int(b.name):
+                     p.sort_photo(photo, b, -1)
+                  else:
+                     p.sort_photo(photo, b, 0)
+
+            for b in p.next_bucket():
+               self.assertEquals(sorted(list(b.during)), sorted(photosByBucket(photos, int(b.name))))
+               self.assertEquals(b.unsorted, set([]))
 
 
 if __name__ == "__main__":

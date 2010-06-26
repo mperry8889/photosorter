@@ -45,6 +45,15 @@ class Bucket(object):
       self.unsorted = set()
       self.unknown = set()
 
+      self.fully_sorted = False
+
+   def __gt__(self, rhs):
+      return int(self.name) > int(rhs.name)
+   def __lt__(self, rhs):
+      return not self.__gt__(rhs)
+
+
+
 
 class PhotoSorter(object):
    def __init__(self, gui=None, loadFromDisk=True, dumpToDisk=True):
@@ -168,6 +177,19 @@ class PhotoSorter(object):
                yield f
          break
 
+   @classmethod
+   def _tree_traverse(cls, l, pivot_list):
+      if len(l) == 0:
+         return
+
+      elif len(l) == 1:
+         pivot_list.append(l[0])
+         return 
+
+      pivot = l[(len(l)/2)]
+      pivot_list.append(pivot)
+      cls._tree_traverse(l[0:(len(l)/2)], pivot_list)
+      cls._tree_traverse(l[(len(l)/2)+1:], pivot_list)
 
    def next_bucket(self):
       """Generator which yields a bucket to sort on.  Buckets will be handed
@@ -175,21 +197,7 @@ class PhotoSorter(object):
       
       # create a binary search tree of buckets
       generator_buckets = []
-
-      def tree_traverse(l, pivot_list):
-         if len(l) == 0:
-            return
-
-         elif len(l) == 1:
-            pivot_list.append(l[0])
-            return 
-
-         pivot = l[(len(l)/2)]
-         pivot_list.append(pivot)
-         tree_traverse(l[0:(len(l)/2)], pivot_list)
-         tree_traverse(l[(len(l)/2)+1:], pivot_list)
-
-      tree_traverse(sorted(self.buckets), generator_buckets)
+      self._tree_traverse(sorted(self.buckets), generator_buckets)
 
       for i in generator_buckets:
          self.CURRENT_BUCKET = i
@@ -204,9 +212,27 @@ class PhotoSorter(object):
                     0 for unknown
                     1 for after
       """
+
+      bucketsInOrder = []
+      self._tree_traverse(sorted(self.buckets), bucketsInOrder)
+      bucketsInOrder = bucketsInOrder[bucketsInOrder.index(bucket)+1:]
+
+
+      earlierBuckets = [b for b in bucketsInOrder if b < bucket]
+      laterBuckets = [b for b in bucketsInOrder if b > bucket]
+
       if direction == -1:
          bucket.unsorted.remove(photo)
          bucket.before.add(photo)
+
+         for earlierBucket in earlierBuckets:
+            earlierBucket.unsorted.add(photo)
+
+         for laterBucket in laterBuckets:
+            try:
+               laterBucket.unsorted.remove(photo)
+            except KeyError:
+               pass
 
       elif direction == 0:
          bucket.unsorted.remove(photo)
@@ -216,48 +242,41 @@ class PhotoSorter(object):
          bucket.unsorted.remove(photo)
          bucket.after.add(photo)
 
+         for laterBucket in laterBuckets:
+            laterBucket.unsorted.add(photo)
+
+         for earlierBucket in earlierBuckets:
+            try:
+               earlierBucket.unsorted.remove(photo)
+            except KeyError:
+               pass
+
       else:
          raise ValueError("Invalid sort direction")
 
-      self.reconcile_buckets()
+      self.merge_during()
 
 
-   def reconcile_buckets(self):
-      """Reconcile all buckets.  If a bucket has "before" and "after" elements,
-      move those into the appropriate bucket.  If a photo is after and before
-      adjacent buckets, add it to the "during" list.  Kind of an expensive
-      operation and there's probably a better way to do this in-line, especially
-      since this is called on every sort operation.
-      
-      Subtle thing: photos can be before the 1st bucket, but can't be after the
-      last bucket.  They can only be during the last bucket, since there's no
-      upper bound to it really."""
+   def merge_during(self):
+      """Figure out which photos are "during" which buckets -- happens in two scenarios:
 
-      for i in range(0, len(self.buckets)):
-         # be careful at the beginning and end of the list
+      1. a photo is after year X and before year X+<foo>
+      2. a photo is after year Y, where Y is the max year
+      """
+
+      for i in range(len(self.buckets)):
          if i == 0:
-            self.buckets[i].unsorted |= self.buckets[i+1].before
-            for item in self.buckets[i].after:
-               if item in self.buckets[i+1].before:
-                  self.buckets[i].during.add(item)
-                  self.buckets[i+1].before.remove(item)
+            self.buckets[i].during |= self.buckets[i].after & self.buckets[i+1].before
 
-         elif i == len(self.buckets)-1:
-            self.buckets[i].unsorted |= self.buckets[i-1].after
+         if i == len(self.buckets)-1:
             self.buckets[i].during |= self.buckets[i].after
 
          else:
-            # prep adjacent buckets for sorting; elements before
-            # a bucket are unsorted for that prior bucket, and
-            # elements after a bucket are unsorted for that next bucket
-            self.buckets[i-1].unsorted |= self.buckets[i].before 
-            self.buckets[i+1].unsorted |= self.buckets[i].after
+            self.buckets[i].during |= self.buckets[i].after & self.buckets[i+1].before
+         
 
-            for item in self.buckets[i].after:
-               if item in self.buckets[i+1].before:
-                  self.buckets[i].during.add(item)
-                  self.buckets[i+1].before.remove(item)
-            
+
+
 
 
 class PhotoSorterGui(object):
