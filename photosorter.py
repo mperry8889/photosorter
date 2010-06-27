@@ -19,11 +19,12 @@ class Photo(object):
       self.filename = filename
       self.rotation = 0
       self.flip_horizontal = False
+      self.delete = False
 
 
 class Bucket(object):
-   def __init__(self, name):
-      self.name = name
+   def __init__(self, year):
+      self.year = year
 
       # a photo can be in one of 5 states relative to a bucket:
       # 1. before the bucket. e.g. photo was taken in 1962, bucket is 1980 
@@ -39,7 +40,7 @@ class Bucket(object):
       self.unknown = set()
 
    def __gt__(self, rhs):
-      return self.name > rhs.name
+      return self.year > rhs.year
    def __lt__(self, rhs):
       return not self.__gt__(rhs)
 
@@ -47,8 +48,7 @@ class Bucket(object):
 
 
 class PhotoSorter(object):
-   def __init__(self, gui=None, loadFromDisk=True, dumpToDisk=True):
-      self.gui = gui
+   def __init__(self, loadFromDisk=True, dumpToDisk=True):
       self.loadFromDisk = loadFromDisk
       self.dumpToDisk = dumpToDisk
 
@@ -81,11 +81,11 @@ class PhotoSorter(object):
          self.CURRENT_BUCKET = None
  
       # bail in there case where only one of current bucket or photo is serialized but
-      # not the other; don't do any recovery, just begin menual intervention here.
+      # not the other; don't do any recovery, just begin manual intervention here.
       # that shouldn't happen and it's not worth figuring out what to do there for 
       # this one-time use app.
-      assert ((self.CURRENT_PHOTO is not None and self.CURRENT_BUCKET is not None) or
-              (self.CURRENT_PHOTO == self.CURRENT_BUCKET == None))
+      #assert ((self.CURRENT_PHOTO is not None and self.CURRENT_BUCKET is not None) or
+      #        (self.CURRENT_PHOTO == self.CURRENT_BUCKET == None))
 
       # prime the first bucket's sort list if it hasn't been sorted yet.  add new candidate
       # photos to the sorter as well if they aren't in the system.
@@ -132,23 +132,22 @@ class PhotoSorter(object):
    def dump(self):
       if self.dumpToDisk:
          for bucket in self.buckets:
-            self.pickle("bucket-%s" % bucket.name, bucket)
+            self.pickle("bucket-%s" % bucket.year, bucket)
+
+         self.pickle("current_bucket", self.CURRENT_BUCKET)
+         self.pickle("current_photo", self.CURRENT_PHOTO)
          
 
    ## image transform methods
 
-   def rotate_clockwise(self, photo, updateGui=True):
+   def rotate_clockwise(self, photo):
       photo.rotation = (photo.rotation + 90) % 360 # in case of 4+ rotations
-      
-      if updateGui:
-         self.gui.redraw_window()
 
-   def flip_horizontal(self, photo, updateGui=True):
+   def flip_horizontal(self, photo):
       photo.flip_horizontal ^= True  # use xor in case of a double-flip
-      
-      if updateGui:
-         self.gui.redraw_window()
 
+   def delete_photo(self, photo):
+      photo.delete = True
 
    ## sort related methods
 
@@ -305,7 +304,7 @@ class PhotoSorterGui(object):
    def main(self):
       """Configure and run the main event loop"""
       
-      self.photoSortingBackend = PhotoSorter(gui=self)
+      self.photoSortingBackend = PhotoSorter()
       self.bucketGenerator = self.photoSortingBackend.next_bucket()
       self.bucketGenerator.next()
       self.photoGenerator = self.photoSortingBackend.next_photo()
@@ -316,7 +315,8 @@ class PhotoSorterGui(object):
       self.helpLabel = gtk.Label()
       self.sortLabel = gtk.Label()
       self.currentFilenameLabel = gtk.Label()
-
+      self.sortedItems = 0
+      self.totalItems = len(self.photoSortingBackend.CURRENT_BUCKET.unsorted)
 
       # set up the sorting window
       self.window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -330,8 +330,6 @@ class PhotoSorterGui(object):
       vbox.show()
       self.window.add(vbox)
 
-      self.progressbar.set_fraction(0.5)
-      self.progressbar.set_text("15 of 1003")
       self.progressbar.show()
       vbox.pack_start(self.progressbar, False, False, 0)
       
@@ -373,6 +371,7 @@ class PhotoSorterGui(object):
    
    
    def quit(self, widget, event):
+      self.photoSortingBackend.dump()
       gtk.main_quit()
 
    def redraw_window(self, increment=False):
@@ -410,12 +409,14 @@ class PhotoSorterGui(object):
             dialog.set_position(gtk.WIN_POS_CENTER_ALWAYS)
             dialog.vbox.pack_start(gtk.Label(
                "Changing the date: BE CAREFUL!\n\n" +
-               "New date is %s\n\n" % self.photoSortingBackend.CURRENT_BUCKET.name +
+               "New date is %s\n\n" % self.photoSortingBackend.CURRENT_BUCKET.year +
                "Press Close to continue sorting.\n\n"
             ))
             dialog.show_all()
             dialog.run()
             dialog.destroy()
+            self.sortedItems = 0
+            self.totalItems = len(self.photoSortingBackend.CURRENT_BUCKET.unsorted)
 
             # since we just incremented the bucket, increment the photo
             # too since the operations are coupled. if this generator has
@@ -428,9 +429,23 @@ class PhotoSorterGui(object):
                self.redraw_window(increment=increment)
 
       if self.photoSortingBackend.CURRENT_PHOTO is not None:
-         self.currentFilenameLabel.set_text(self.photoSortingBackend.CURRENT_PHOTO.filename)
+         self.currentFilenameLabel.set_text(os.path.basename(self.photoSortingBackend.CURRENT_PHOTO.filename))
       
-      self.sortLabel.set_text(str(self.photoSortingBackend.CURRENT_BUCKET.name))
+      try:
+         self.progressbar.set_fraction(float((1.0*self.sortedItems) / self.totalItems))
+      except ZeroDivisionError:
+         pass
+      self.progressbar.set_text("%d of %d" % (self.sortedItems, self.totalItems))
+      self.sortLabel.set_text(str(self.photoSortingBackend.CURRENT_BUCKET.year))
+      self.helpLabel.set_text(
+         "Keyboard Commands:\n" +
+         " 1: before %s\n" % self.photoSortingBackend.CURRENT_BUCKET.year +
+         " 2: after %s\n" % self.photoSortingBackend.CURRENT_BUCKET.year +
+         " 3: don't know\n" +
+         " H: flip horizontal\n" +
+         " L: rotate 90 degrees\n" +
+         ""
+      )
       self.window.resize(1, 1)
 
 
@@ -446,15 +461,13 @@ class PhotoSorterGui(object):
          if chr(event.keyval).upper() == "N":
             pass
 
-         if chr(event.keyval).upper() == "P":
-            pass
-
          # 1: photo is before current bucket
          if chr(event.keyval) == "1":
             if self.photoSortingBackend.CURRENT_PHOTO is not None:
                self.photoSortingBackend.sort_photo(self.photoSortingBackend.CURRENT_PHOTO,
                                                    self.photoSortingBackend.CURRENT_BUCKET,
                                                    -1)
+               self.sortedItems += 1
                self.redraw_window(increment=True)
          
          # 2: photo is after current bucket
@@ -463,6 +476,7 @@ class PhotoSorterGui(object):
                self.photoSortingBackend.sort_photo(self.photoSortingBackend.CURRENT_PHOTO,
                                                    self.photoSortingBackend.CURRENT_BUCKET,
                                                    1)
+               self.sortedItems += 1
                self.redraw_window(increment=True)
          
          # 3: user doesn't know timeframe of photo
@@ -471,11 +485,12 @@ class PhotoSorterGui(object):
                self.photoSortingBackend.sort_photo(self.photoSortingBackend.CURRENT_PHOTO,
                                                    self.photoSortingBackend.CURRENT_BUCKET,
                                                    0)
+               self.sortedItems += 1
                self.redraw_window(increment=True)
 
          if chr(event.keyval).upper() == "D":
             for bucket in self.photoSortingBackend.buckets:
-               print bucket.name, bucket.unsorted
+               print bucket.year, [b.filename for b in bucket.unsorted]
 
          # L: rotate photo 90 degrees.  may rotate several times.
          if chr(event.keyval).upper() == "L":
@@ -492,7 +507,9 @@ class PhotoSorterGui(object):
 
          # Z: move "unknown" photos to "unsorted"
          if chr(event.keyval).upper() == "Z":
-            pass
+            for bucket in self.photoSortingBackend.buckets:
+               bucket.unsorted |= bucket.unknown
+               bucket.unknown = set([])
 
          # resize window if necessary
          if type(widget) == gtk.Window:

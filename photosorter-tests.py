@@ -19,7 +19,7 @@ class TestPhotoSorter(unittest.TestCase):
     def test_loadBuckets(self):
        """Test that buckets are loaded properly"""
        p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
-       self.assertEquals(sorted(map(lambda i: i.name, p.buckets)), sorted(SORT_BUCKETS))
+       self.assertEquals(sorted(map(lambda i: i.year, p.buckets)), sorted(SORT_BUCKETS))
  
     def test_checkForFiles(self):
        """Check that files are in the file list"""
@@ -34,10 +34,12 @@ class TestPhotoSorter(unittest.TestCase):
        p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
        for f in p.photolist:
           for i in range(0, 5):
-             p.rotate_clockwise(f, updateGui=False)
-             p.flip_horizontal(f, updateGui=False)
+             p.rotate_clockwise(f)
+             p.flip_horizontal(f)
+             p.delete(f)
           self.assertEquals(f.rotation, 90)
           self.assertEquals(f.flip_horizontal, True)
+          self.assertEquals(f.delete, True)
  
     def test_bucketGenerator(self):
        """Iterate through the list of buckets, in sort-worthy order"""
@@ -46,7 +48,7 @@ class TestPhotoSorter(unittest.TestCase):
        for i in p.next_bucket():
           buckets.append(i)
  
-       self.assertEquals(sorted([i.name for i in buckets]), [i.name for i in p.buckets])
+       self.assertEquals(sorted([i.year for i in buckets]), [i.year for i in p.buckets])
  
     def test_imageGenerator(self):
        """Iterate through list of unsorted images"""
@@ -88,7 +90,7 @@ class TestPhotoSorter(unittest.TestCase):
        bucketlist = [Bucket(i) for i in [1, 2, 3]]
        retval = []
        PhotoSorter._tree_traverse(bucketlist, retval)
-       self.assertEquals([b.name for b in retval], [2, 3, 1])
+       self.assertEquals([b.year for b in retval], [2, 3, 1])
  
     def test_multiBucketPhotoGenerator(self):
        """Iterate through list of potos in multiple buckets"""
@@ -230,15 +232,15 @@ class TestPhotoSorter(unittest.TestCase):
  
        for b in p.next_bucket():
           for photo in p.next_photo():
-             if photos[photo] >= int(b.name):
+             if photos[photo] >= int(b.year):
                 p.sort_photo(photo, b, 1)
-             elif photos[photo] < int(b.name):
+             elif photos[photo] < int(b.year):
                 p.sort_photo(photo, b, -1)
              else:
                 p.sort_photo(photo, b, 0)
  
        for b in p.next_bucket():
-          self.assertEquals(sorted(list(b.during)), sorted(photosByBucket(photos, int(b.name))))
+          self.assertEquals(sorted(list(b.during)), sorted(photosByBucket(photos, int(b.year))))
           self.assertEquals(b.unsorted, set([]))
  
     def test_skipReconcileBuckets(self):
@@ -276,15 +278,15 @@ class TestPhotoSorter(unittest.TestCase):
  
        for b in p.next_bucket():
           for photo in p.next_photo():
-             if photos[photo] >= int(b.name):
+             if photos[photo] >= int(b.year):
                 p.sort_photo(photo, b, 1)
-             elif photos[photo] < int(b.name):
+             elif photos[photo] < int(b.year):
                 p.sort_photo(photo, b, -1)
              else:
                 p.sort_photo(photo, b, 0)
  
        for b in p.next_bucket():
-          self.assertEquals(sorted(list(b.during)), sorted(photosByBucket(photos, int(b.name))))
+          self.assertEquals(sorted(list(b.during)), sorted(photosByBucket(photos, int(b.year))))
           self.assertEquals(b.unsorted, set([]))
  
     def test_incrementalSort(self):
@@ -312,15 +314,15 @@ class TestPhotoSorter(unittest.TestCase):
  
              for b in p.next_bucket():
                 for photo in p.next_photo():
-                   if photos[photo] >= int(b.name):
+                   if photos[photo] >= int(b.year):
                       p.sort_photo(photo, b, 1)
-                   elif photos[photo] < int(b.name):
+                   elif photos[photo] < int(b.year):
                       p.sort_photo(photo, b, -1)
                    else:
                       p.sort_photo(photo, b, 0)
  
              for b in p.next_bucket():
-                self.assertEquals(sorted(list(b.during)), sorted(photosByBucket(photos, int(b.name))))
+                self.assertEquals(sorted(list(b.during)), sorted(photosByBucket(photos, int(b.year))))
                 self.assertEquals(b.unsorted, set([]))
  
     def test_randomizedSort(self):
@@ -349,15 +351,15 @@ class TestPhotoSorter(unittest.TestCase):
  
           for b in p.next_bucket():
              for photo in p.next_photo():
-                if photos[photo] >= int(b.name):
+                if photos[photo] >= int(b.year):
                    p.sort_photo(photo, b, 1)
-                elif photos[photo] < int(b.name):
+                elif photos[photo] < int(b.year):
                    p.sort_photo(photo, b, -1)
                 else:
                    p.sort_photo(photo, b, 0)
  
           for b in p.next_bucket():
-             self.assertEquals(sorted(list(b.during)), sorted(photosByBucket(photos, int(b.name))))
+             self.assertEquals(sorted(list(b.during)), sorted(photosByBucket(photos, int(b.year))))
              self.assertEquals(b.unsorted, set([]))
 
 if __name__ == "__main__":
