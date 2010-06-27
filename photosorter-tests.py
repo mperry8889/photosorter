@@ -36,7 +36,7 @@ class TestPhotoSorter(unittest.TestCase):
           for i in range(0, 5):
              p.rotate_clockwise(f)
              p.flip_horizontal(f)
-             p.delete(f)
+             p.delete_photo(f, p.CURRENT_BUCKET)
           self.assertEquals(f.rotation, 90)
           self.assertEquals(f.flip_horizontal, True)
           self.assertEquals(f.delete, True)
@@ -192,7 +192,6 @@ class TestPhotoSorter(unittest.TestCase):
        buckets = []
        PhotoSorter._tree_traverse(p.buckets, buckets)
  
-       print "bux", buckets
        self.assertEquals(buckets[0].before, buckets[2].unsorted)
        self.assertEquals(buckets[0].after, buckets[1].unsorted)
        self.assertEquals(buckets[0].unknown, set([2]))

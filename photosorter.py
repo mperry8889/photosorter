@@ -146,8 +146,9 @@ class PhotoSorter(object):
    def flip_horizontal(self, photo):
       photo.flip_horizontal ^= True  # use xor in case of a double-flip
 
-   def delete_photo(self, photo):
+   def delete_photo(self, photo, bucket):
       photo.delete = True
+      bucket.unsorted -= set([photo])
 
    ## sort related methods
 
@@ -162,8 +163,12 @@ class PhotoSorter(object):
       while True:
          for f in copy(self.CURRENT_BUCKET.unsorted):
             if f in sorted(self.CURRENT_BUCKET.unsorted):
-               self.CURRENT_PHOTO = f
-               yield f
+               # minor hack here (checking type) for testing
+               if type(f) is Photo and f.delete is True:
+                  continue
+               else:
+                  self.CURRENT_PHOTO = f
+                  yield f
             else:
                break
          break
@@ -194,20 +199,6 @@ class PhotoSorter(object):
             pass
 
 
-#   @classmethod
-#   def _tree_traverse(cls, l, pivot_list):
-#      if len(l) == 0:
-#         return
-#
-#      elif len(l) == 1:
-#         pivot_list.append(l[0])
-#         return 
-#
-#      pivot = l[(len(l)/2)]
-#      pivot_list.append(pivot)
-#      cls._tree_traverse(l[0:(len(l)/2)], pivot_list)
-#      cls._tree_traverse(l[(len(l)/2)+1:], pivot_list)
-
    def next_bucket(self):
       """Generator which yields a bucket to sort on.  Buckets will be handed
       back in a tree-like fashion to produce a sorting effect similar to quicksort"""
@@ -234,16 +225,19 @@ class PhotoSorter(object):
       # earlier or later bucket based on sort direction
 
       bucketsInOrder = []
-      self._tree_traverse(sorted(self.buckets), bucketsInOrder)
-      bucketsInOrder = bucketsInOrder[bucketsInOrder.index(bucket)+1:]
+      self._tree_traverse(self.buckets, bucketsInOrder)
 
       earlierBucket = None
       laterBucket = None
-      for b in bucketsInOrder:
-         if b < bucket:
+      for b in bucketsInOrder[bucketsInOrder.index(bucket)+1:]:
+         # avoid a corner case where photos are added as unsorted to buckets
+         # far less than the starting bucket. this happens because the bucket
+         # traversal happens ascending first, then descending; so only add to
+         # lower buckets if we're sorting downwards. if that makes sense.
+         if b < bucket < bucketsInOrder[0]:
             earlierBucket = b
             break
-      for b in bucketsInOrder:
+      for b in bucketsInOrder[bucketsInOrder.index(bucket)+1:]:
          if b > bucket:
             laterBucket = b
             break
@@ -290,9 +284,6 @@ class PhotoSorter(object):
          else:
             self.buckets[i].during |= self.buckets[i].after & self.buckets[i+1].before
          
-
-
-
 
 
 class PhotoSorterGui(object):
@@ -374,6 +365,18 @@ class PhotoSorterGui(object):
       self.photoSortingBackend.dump()
       gtk.main_quit()
 
+
+   def _display_image(self):
+      self.image.set_from_file(self.photoSortingBackend.CURRENT_PHOTO.filename)
+
+      rotation = 0
+      while rotation < self.photoSortingBackend.CURRENT_PHOTO.rotation:
+         self.image.set_from_pixbuf(self.image.get_pixbuf().rotate_simple(gtk.gdk.PIXBUF_ROTATE_CLOCKWISE))
+         rotation += 90
+      
+      if self.photoSortingBackend.CURRENT_PHOTO.flip_horizontal:
+         self.image.set_from_pixbuf(self.image.get_pixbuf().flip(True))
+
    def redraw_window(self, increment=False):
       if increment is True:
          # use photo sorting backend's funky generators. very weird try/except
@@ -384,7 +387,6 @@ class PhotoSorterGui(object):
          # still keep generating photos.
          try:
             self.photoGenerator.next()
-            self.image.set_from_file(self.photoSortingBackend.CURRENT_PHOTO.filename)
 
          # current bucket has no more photos
          except StopIteration:
@@ -424,12 +426,13 @@ class PhotoSorterGui(object):
             try:
                self.photoGenerator = self.photoSortingBackend.next_photo()
                self.photoGenerator.next()
-               self.image.set_from_file(self.photoSortingBackend.CURRENT_PHOTO.filename)
             except StopIteration:
                self.redraw_window(increment=increment)
 
+
       if self.photoSortingBackend.CURRENT_PHOTO is not None:
          self.currentFilenameLabel.set_text(os.path.basename(self.photoSortingBackend.CURRENT_PHOTO.filename))
+         self._display_image()
       
       try:
          self.progressbar.set_fraction(float((1.0*self.sortedItems) / self.totalItems))
@@ -452,15 +455,6 @@ class PhotoSorterGui(object):
    def keyboard_command(self, widget, event):
 
       try:
-         if chr(event.keyval).upper() == "A":
-            pass
-
-         if chr(event.keyval).upper() == "B":
-            pass
-         
-         if chr(event.keyval).upper() == "N":
-            pass
-
          # 1: photo is before current bucket
          if chr(event.keyval) == "1":
             if self.photoSortingBackend.CURRENT_PHOTO is not None:
@@ -499,6 +493,13 @@ class PhotoSorterGui(object):
          # H: flip photo horizontally
          if chr(event.keyval).upper() == "H":
             self.photoSortingBackend.flip_horizontal(self.photoSortingBackend.CURRENT_PHOTO)
+         
+         # X: delete photo
+         if chr(event.keyval).upper() == "X":
+            self.photoSortingBackend.delete_photo(self.photoSortingBackend.CURRENT_PHOTO,
+                                                  self.photoSortingBackend.CURRENT_BUCKET)
+            self.sortedItems += 1
+            self.redraw_window(increment=True)
 
          # Q: dump state and quit
          if chr(event.keyval).upper() == "Q":
