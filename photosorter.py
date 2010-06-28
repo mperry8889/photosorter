@@ -447,6 +447,7 @@ class PhotoSorterGui(object):
          " 3: don't know\n" +
          " H: flip horizontal\n" +
          " L: rotate 90 degrees\n" +
+         " D: delete photo\n" +
          ""
       )
       self.window.resize(1, 1)
