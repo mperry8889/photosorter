@@ -84,12 +84,13 @@ class TestPhotoSorter(unittest.TestCase):
 
         self.assertEquals(photos, generated_photos)
 
-    def test_treeTraverse(self):
-        """Tree traverse"""
+    def test_sortBucketTraverse(self):
+        """Sort bucket traversal"""
 
         bucketlist = [Bucket(i) for i in [1, 2, 3]]
-        retval = []
-        PhotoSorter._tree_traverse(bucketlist, retval)
+        retval = PhotoSorter.sort_bucket_traverse(PhotoSorter(loadFromDisk=False,
+                                                              dumpToDisk=False),
+                                                  bucketlist)
         self.assertEquals([b.year for b in retval], [2, 3, 1])
 
     def test_multiBucketPhotoGenerator(self):
@@ -189,8 +190,7 @@ class TestPhotoSorter(unittest.TestCase):
             self.assertEquals(len(b.unknown), 1)
             break
 
-        buckets = []
-        PhotoSorter._tree_traverse(p.buckets, buckets)
+        buckets = p.sort_bucket_traverse(p.buckets)
 
         self.assertEquals(buckets[0].before, buckets[2].unsorted)
         self.assertEquals(buckets[0].after, buckets[1].unsorted)

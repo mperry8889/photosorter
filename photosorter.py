@@ -81,10 +81,12 @@ class PhotoSorter(object):
             self.CURRENT_PHOTO = None
             self.CURRENT_BUCKET = None
 
-        # bail in there case where only one of current bucket or photo is serialized but
-        # not the other; don't do any recovery, just begin manual intervention here.
-        # that shouldn't happen and it's not worth figuring out what to do there for
-        # this one-time use app.
+        # XXX note: the below assert fails in the case where all photos are sorted.
+        # rather than making it more complicated and obscure, just comment it out
+        ## bail in there case where only one of current bucket or photo is serialized but
+        ## not the other; don't do any recovery, just begin manual intervention here.
+        ## that shouldn't happen and it's not worth figuring out what to do there for
+        ## this one-time use app.
         #assert ((self.CURRENT_PHOTO is not None and self.CURRENT_BUCKET is not None) or
         #        (self.CURRENT_PHOTO == self.CURRENT_BUCKET == None))
 
@@ -98,13 +100,13 @@ class PhotoSorter(object):
 
     ## object support methods
 
-    def pickle(self, name, obj):
+    def pickle(cls, name, obj):
         """Serialize an object and write it out to disk"""
         pickleFile = open("files/%s" % name, "w+")
         pickle.dump(obj, pickleFile)
         pickleFile.close()
 
-    def unpickle(self, name, objType, *objTypeArgs, **kwArgs):
+    def unpickle(cls, name, objType, *objTypeArgs, **kwArgs):
         """Return deserialized object, or newly-initialized object if one doesn't exist on disk.
         If newObject is set to False, will return None if the object can't be unpickled.
         """
@@ -128,7 +130,6 @@ class PhotoSorter(object):
             pickleFile.close()
 
         return obj
-
 
     def dump(self):
         if self.dumpToDisk:
@@ -177,27 +178,34 @@ class PhotoSorter(object):
         self.CURRENT_PHOTO = None
 
 
-    @classmethod
-    def _tree_traverse(cls, l, pivot_list):
-        sortedList = sorted(l)
-        middle = len(sortedList)/2
-        pivot_list.append(sortedList[middle])
+    def sort_bucket_traverse(self, bucketList):
+        """Return a reordered bucket list, in the order in which yields a favorable
+        comparison tree.  For the example of [1960 1970 1980 1990 2000] return
+        [1980 1990 2000 1970 1960] -- start with the middle element to partition
+        photos before and after an obvious year, and then bubble them outwards
+        into the appropriate buckets."""
 
-        for i in range(1, (len(sortedList)/2)+1):
+        sortedList = sorted(bucketList)
+        middle = len(sortedList)/2
+        returnList = [sortedList[middle]]
+
+        for i in range(1, middle+1):
 
             # elements after middle
             try:
-                pivot_list.append(sortedList[middle+i])
+                returnList.append(sortedList[middle+i])
             except IndexError:
                 pass
 
-        for i in range(1, (len(sortedList)/2)+1):
+        for i in range(1, middle+1):
 
             # elements before middle
             try:
-                pivot_list.append(sortedList[middle+(-1*i)])
+                returnList.append(sortedList[middle+(-1*i)])
             except IndexError:
                 pass
+
+        return returnList
 
 
     def next_bucket(self):
@@ -205,8 +213,7 @@ class PhotoSorter(object):
         back in a tree-like fashion to produce a sorting effect similar to quicksort"""
 
         # create a binary search tree of buckets
-        generator_buckets = []
-        self._tree_traverse(self.buckets, generator_buckets)
+        generator_buckets = self.sort_bucket_traverse(self.buckets)
 
         for i in generator_buckets:
             self.CURRENT_BUCKET = i
@@ -225,8 +232,7 @@ class PhotoSorter(object):
         # in addition to sorting the photo in question, add it to the next
         # earlier or later bucket based on sort direction
 
-        bucketsInOrder = []
-        self._tree_traverse(self.buckets, bucketsInOrder)
+        bucketsInOrder = self.sort_bucket_traverse(self.buckets)
 
         earlierBucket = None
         laterBucket = None
@@ -243,6 +249,7 @@ class PhotoSorter(object):
                 laterBucket = b
                 break
 
+        # item is before the bucket date
         if direction == -1:
             bucket.unsorted.remove(photo)
             bucket.before.add(photo)
@@ -250,17 +257,18 @@ class PhotoSorter(object):
             if earlierBucket is not None:
                 earlierBucket.unsorted.add(photo)
 
+        # item is after the bucket date
         elif direction == 0:
             bucket.unsorted.remove(photo)
             bucket.unknown.add(photo)
 
+        # item is of unknown date
         elif direction == 1:
             bucket.unsorted.remove(photo)
             bucket.after.add(photo)
 
             if laterBucket is not None:
                 laterBucket.unsorted.add(photo)
-
 
         else:
             raise ValueError("Invalid sort direction")
@@ -531,8 +539,6 @@ class PhotoSorterGui(object):
 
 
 if __name__ == "__main__":
-
-
-
     g = PhotoSorterGui()
     g.main()
+
