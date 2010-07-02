@@ -333,7 +333,7 @@ class TestPhotoSorter(unittest.TestCase):
                     retv.append(i)
             return retv
 
-        for iter in range(1):
+        for iter in range(10):
             numBuckets = random.randint(2, 100)
             numPhotos = random.randint(1, 10000)
 
