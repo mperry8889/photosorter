@@ -3,14 +3,15 @@
 
 
 import os
-import pygtk
-pygtk.require('2.0')
 import gtk
 import pango
 from PIL import Image as PILImage
 import pickle
 from copy import copy
+from optparse import OptionParser
 
+import pygtk
+pygtk.require('2.0')
 
 SORT_BUCKETS = [1950, 1960, 1970, 1980, 1990, 2000]
 
@@ -64,7 +65,7 @@ class PhotoSorter(object):
       for file in self.filelist:
          if not filter(file):
             self.filelist.remove(file)
-      self.photolist = [Photo("images/%s" % f) for f in sorted(self.filelist)]
+      self.photolist = [Photo("images/%s" % f) for f in self.filelist]
 
       if self.loadFromDisk:
          # resume sorting from point of last exit
@@ -161,8 +162,8 @@ class PhotoSorter(object):
       # use that for generation.  if the list is changed, reset
       # generation. 
       while True:
-         for f in copy(self.CURRENT_BUCKET.unsorted):
-            if f in sorted(self.CURRENT_BUCKET.unsorted):
+         for f in copy(sorted(self.CURRENT_BUCKET.unsorted)):
+            if f in self.CURRENT_BUCKET.unsorted:
                # minor hack here (checking type) for testing
                if type(f) is Photo and f.delete is True:
                   continue
@@ -205,7 +206,7 @@ class PhotoSorter(object):
       
       # create a binary search tree of buckets
       generator_buckets = []
-      self._tree_traverse(sorted(self.buckets), generator_buckets)
+      self._tree_traverse(self.buckets, generator_buckets)
 
       for i in generator_buckets:
          self.CURRENT_BUCKET = i
@@ -483,6 +484,7 @@ class PhotoSorterGui(object):
                self.sortedItems += 1
                self.redraw_window(increment=True)
 
+         # D: dump information about unsorted buckets
          if chr(event.keyval).upper() == "D":
             for bucket in self.photoSortingBackend.buckets:
                print bucket.year, [b.filename for b in bucket.unsorted]
@@ -529,6 +531,9 @@ class PhotoSorterGui(object):
 
 
 if __name__ == "__main__":
-   g = PhotoSorterGui()
-   g.main()
+
+    
+
+    g = PhotoSorterGui()
+    g.main()
 
