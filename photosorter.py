@@ -370,7 +370,7 @@ class PhotoSorterGui(object):
         self.window.set_border_width(10)
         self.window.connect("delete_event", self.quit)
         self.window.connect("key_press_event", self.keyboard_command)
-        if self.maximize and False:
+        if self.maximize:
             self.window.maximize()
         else:
             self.window.resize(1, 1)
@@ -512,7 +512,7 @@ class PhotoSorterGui(object):
            ""
         )
         
-        if self.maximize and False:
+        if self.maximize:
             self.window.maximize()
         else:
             self.window.resize(1, 1)
