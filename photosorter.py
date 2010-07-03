@@ -81,9 +81,10 @@ class PhotoSorter(object):
             # use the generator to wind up to the current bucket, instead of a direct
             # assignment, which doesn't restore generator state
             current_bucket = self.unpickle("current_bucket", None, newObject=False)
-            for bucket in self.next_bucket():
-                if bucket == current_bucket:
-                    break
+            if current_bucket is not None:
+                for bucket in self.next_bucket():
+                    if bucket == current_bucket:
+                        break
 
         # used mostly in testing
         else:
