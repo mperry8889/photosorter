@@ -196,6 +196,30 @@ class TestPhotoSorter(unittest.TestCase):
         self.assertEquals(buckets[0].after, buckets[1].unsorted)
         self.assertEquals(buckets[0].unknown, set([2]))
 
+    def test_unsort(self):
+        """Unsort photos"""
+        def direction():
+            values = [-1, 0, 1]
+            for i in values:
+                yield i
+
+        p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
+        p.buckets = [Bucket(i) for i in [1, 2, 3]]
+        photos = [1, 2, 3]
+
+        for b in p.next_bucket():
+            b.unsorted = set(photos)
+            break
+
+        for b in p.next_bucket():
+            d = direction()
+            for photo in p.next_photo():
+                p.sort_photo(photo, b, d.next())
+
+        p.unsort(photos[0])
+        self.assertEquals(p.sort_bucket_traverse(p.buckets)[0].unsorted, set([photos[0]]))
+
+
     def test_mediumReconcileBuckets(self):
         """More advanced case of reconciling several buckets"""
         def photosByBucket(p, bucket):
@@ -297,7 +321,7 @@ class TestPhotoSorter(unittest.TestCase):
                     retv.append(i)
             return retv
 
-        for numBuckets in range(2, 25):
+        for numBuckets in range(2, 5):
             for numPhotos in range(1, numBuckets+25):
 
                 p = PhotoSorter(loadFromDisk=False, dumpToDisk=False)
@@ -333,7 +357,7 @@ class TestPhotoSorter(unittest.TestCase):
                     retv.append(i)
             return retv
 
-        for iter in range(10):
+        for iter in range(1):
             numBuckets = random.randint(2, 100)
             numPhotos = random.randint(1, 10000)
 

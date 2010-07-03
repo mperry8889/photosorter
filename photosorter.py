@@ -46,8 +46,6 @@ class Bucket(object):
         return not self.__gt__(rhs)
 
 
-
-
 class PhotoSorter(object):
     def __init__(self, loadFromDisk=True, dumpToDisk=True):
         self.loadFromDisk = loadFromDisk
@@ -97,16 +95,19 @@ class PhotoSorter(object):
                 bucket.unsorted = set(self.photolist)
                 break
 
+        self.PREVIOUS_PHOTO = None
+        self._RESTART_PHOTO_GENERATOR = False
+
 
     ## object support methods
 
-    def pickle(cls, name, obj):
+    def pickle(self, name, obj):
         """Serialize an object and write it out to disk"""
         pickleFile = open("files/%s" % name, "w+")
         pickle.dump(obj, pickleFile)
         pickleFile.close()
 
-    def unpickle(cls, name, objType, *objTypeArgs, **kwArgs):
+    def unpickle(self, name, objType, *objTypeArgs, **kwArgs):
         """Return deserialized object, or newly-initialized object if one doesn't exist on disk.
         If newObject is set to False, will return None if the object can't be unpickled.
         """
@@ -157,6 +158,14 @@ class PhotoSorter(object):
     def next_photo(self):
         """Generator which yields the next photo in the current bucket.  Resets
         file list is bucket changes."""
+
+        # self._RESTART_PHOTO_GENERATOR is a really gross way to restart the
+        # photo loop from the first unsorted picture. works in the case where
+        # you unsort a photo, and want to go right back to it on the next
+        # iteration (since it has the "least" filename).  gross hack, too much
+        # state, but these generators really aren't great for state machines,
+        # which this has photo sorter turned in to.
+
         bucket = self.CURRENT_BUCKET
 
         # unsorted list may change on photo sort, so copy the list and
@@ -164,16 +173,25 @@ class PhotoSorter(object):
         # generation.
         while True:
             for f in copy(sorted(self.CURRENT_BUCKET.unsorted)):
+                if self._RESTART_PHOTO_GENERATOR:
+                    break
+
                 if f in self.CURRENT_BUCKET.unsorted:
                     # minor hack here (checking type) for testing
                     if type(f) is Photo and f.delete is True:
                         continue
                     else:
+                        self.PREVIOUS_PHOTO = self.CURRENT_PHOTO
                         self.CURRENT_PHOTO = f
                         yield f
                 else:
                     break
-            break
+
+            if self._RESTART_PHOTO_GENERATOR:
+                self._RESTART_PHOTO_GENERATOR = False
+                continue
+            else:
+                break
 
         self.CURRENT_PHOTO = None
 
@@ -292,6 +310,22 @@ class PhotoSorter(object):
 
             else:
                 self.buckets[i].during |= self.buckets[i].after & self.buckets[i+1].before
+
+    def unsort(self, photo):
+        """Unsort a photo; remove it from all buckets and return it to the first bucket for 
+        full re-sorting.  Strong "undo" function, since it obliterates sort state rather than
+        just undoing the previous operation, but it's easy to code."""
+
+        for bucket in self.buckets:
+           bucket.unsorted -= set([photo])
+           bucket.before -= set([photo])
+           bucket.during -= set([photo])
+           bucket.after -= set([photo])
+           bucket.unknown -= set([photo])
+
+        bucketsInOrder = self.sort_bucket_traverse(self.buckets)
+        bucketsInOrder[0].unsorted.add(photo)
+        self._RESTART_PHOTO_GENERATOR = True
 
 
 
@@ -504,6 +538,11 @@ class PhotoSorterGui(object):
             # H: flip photo horizontally
             if chr(event.keyval).upper() == "H":
                 self.photoSortingBackend.flip_horizontal(self.photoSortingBackend.CURRENT_PHOTO)
+
+            # U: undo last sorting operation
+            if chr(event.keyval).upper() == "U":
+                self.photoSortingBackend.unsort(self.photoSortingBackend.PREVIOUS_PHOTO)
+                self.sortedItems -= 1
 
             # X: delete photo
             if chr(event.keyval).upper() == "X":
