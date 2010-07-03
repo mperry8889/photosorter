@@ -22,6 +22,13 @@ class Photo(object):
         self.flip_horizontal = False
         self.delete = False
 
+    def __gt__(self, rhs):
+        return self.filename > rhs.filename
+    def __lt__(self, rhs):
+        return not self.__gt__(rhs)
+    def __eq__(self, rhs):
+        return self.filename == rhs.filename
+
 
 class Bucket(object):
     def __init__(self, year):
@@ -44,6 +51,8 @@ class Bucket(object):
         return self.year > rhs.year
     def __lt__(self, rhs):
         return not self.__gt__(rhs)
+    def __eq__(self, rhs):
+        return self.year == rhs.year
 
 
 class PhotoSorter(object):
@@ -69,14 +78,17 @@ class PhotoSorter(object):
             # resume sorting from point of last exit
             self.buckets = [self.unpickle("bucket-%s" % b, Bucket, b) for b in SORT_BUCKETS]
 
-            self.CURRENT_PHOTO = self.unpickle("current_photo", None, newObject=False)
-            self.CURRENT_BUCKET = self.unpickle("current_bucket", None, newObject=False)
+            # use the generator to wind up to the current bucket, instead of a direct
+            # assignment, which doesn't restore generator state
+            current_bucket = self.unpickle("current_bucket", None, newObject=False)
+            for bucket in self.next_bucket():
+                if bucket == current_bucket:
+                    break
 
         # used mostly in testing
         else:
             self.buckets = [Bucket(b) for b in SORT_BUCKETS]
 
-            self.CURRENT_PHOTO = None
             self.CURRENT_BUCKET = None
 
         # XXX note: the below assert fails in the case where all photos are sorted.
@@ -138,7 +150,6 @@ class PhotoSorter(object):
                 self.pickle("bucket-%s" % bucket.year, bucket)
 
             self.pickle("current_bucket", self.CURRENT_BUCKET)
-            self.pickle("current_photo", self.CURRENT_PHOTO)
 
 
     ## image transform methods
