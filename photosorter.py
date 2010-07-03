@@ -491,6 +491,7 @@ class PhotoSorterGui(object):
            " H: flip horizontal\n" +
            " L: rotate 90 degrees\n" +
            " D: delete photo\n" +
+           " U: undo last sort\n" +
            ""
         )
         self.window.resize(1, 1)
@@ -526,11 +527,6 @@ class PhotoSorterGui(object):
                     self.sortedItems += 1
                     self.redraw_window(increment=True)
 
-            # D: dump information about unsorted buckets
-            if chr(event.keyval).upper() == "D":
-                for bucket in self.photoSortingBackend.buckets:
-                    print bucket.year, [b.filename for b in bucket.unsorted]
-
             # L: rotate photo 90 degrees.  may rotate several times.
             if chr(event.keyval).upper() == "L":
                 self.photoSortingBackend.rotate_clockwise(self.photoSortingBackend.CURRENT_PHOTO)
@@ -544,8 +540,8 @@ class PhotoSorterGui(object):
                 self.photoSortingBackend.unsort(self.photoSortingBackend.PREVIOUS_PHOTO)
                 self.sortedItems -= 1
 
-            # X: delete photo
-            if chr(event.keyval).upper() == "X":
+            # D: delete photo
+            if chr(event.keyval).upper() == "D":
                 self.photoSortingBackend.delete_photo(self.photoSortingBackend.CURRENT_PHOTO,
                                                       self.photoSortingBackend.CURRENT_BUCKET)
                 self.sortedItems += 1
@@ -555,12 +551,21 @@ class PhotoSorterGui(object):
             if chr(event.keyval).upper() == "Q":
                 self.quit(None, None)
                 return
+            
+            # X: dump information about unsorted buckets
+            if chr(event.keyval).upper() == "X":
+                for bucket in self.photoSortingBackend.buckets:
+                    print bucket.year, [b.filename for b in bucket.unsorted]
+
 
             # Z: move "unknown" photos to "unsorted"
             if chr(event.keyval).upper() == "Z":
                 for bucket in self.photoSortingBackend.buckets:
                     bucket.unsorted |= bucket.unknown
                     bucket.unknown = set([])
+
+                # modify internal state variable... shhhh
+                self.photoSortingBackend._RESTART_PHOTO_GENERATOR = True
 
             # resize window if necessary
             if type(widget) == gtk.Window:
