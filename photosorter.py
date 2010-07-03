@@ -370,7 +370,7 @@ class PhotoSorterGui(object):
         self.window.set_border_width(10)
         self.window.connect("delete_event", self.quit)
         self.window.connect("key_press_event", self.keyboard_command)
-        if self.maximize:
+        if self.maximize and False:
             self.window.maximize()
         else:
             self.window.resize(1, 1)
@@ -491,6 +491,7 @@ class PhotoSorterGui(object):
 
         if self.photoSortingBackend.CURRENT_PHOTO is not None:
             self.currentFilenameLabel.set_text(os.path.basename(self.photoSortingBackend.CURRENT_PHOTO.filename))
+            self._display_image()
 
         try:
             self.progressbar.set_fraction(float((1.0*self.sortedItems) / self.totalItems))
@@ -511,7 +512,7 @@ class PhotoSorterGui(object):
            ""
         )
         
-        if self.maximize:
+        if self.maximize and False:
             self.window.maximize()
         else:
             self.window.resize(1, 1)
