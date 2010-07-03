@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #-*- coding: iso-8859-15 -*-
 
-
+import sys
 import os
 import gtk
 import pango
@@ -342,10 +342,11 @@ class PhotoSorter(object):
 
 
 class PhotoSorterGui(object):
-    def __init__(self):
+    def __init__(self, maximize=False):
         self.image = None
         self.progress = None
         self.bucket = None
+        self.maximize = maximize
 
     def main(self):
         """Configure and run the main event loop"""
@@ -369,7 +370,10 @@ class PhotoSorterGui(object):
         self.window.set_border_width(10)
         self.window.connect("delete_event", self.quit)
         self.window.connect("key_press_event", self.keyboard_command)
-        self.window.resize(1, 1)
+        if self.maximize:
+            self.window.maximize()
+        else:
+            self.window.resize(1, 1)
         self.window.show()
 
         vbox = gtk.VBox()
@@ -482,18 +486,18 @@ class PhotoSorterGui(object):
                     self.photoGenerator = self.photoSortingBackend.next_photo()
                     self.photoGenerator.next()
                 except StopIteration:
-                    self.redraw_window(increment=increment)
+                    self.redraw_window(increment=increment) # XXX eats stack
 
 
         if self.photoSortingBackend.CURRENT_PHOTO is not None:
             self.currentFilenameLabel.set_text(os.path.basename(self.photoSortingBackend.CURRENT_PHOTO.filename))
-            self._display_image()
 
         try:
             self.progressbar.set_fraction(float((1.0*self.sortedItems) / self.totalItems))
         except ZeroDivisionError:
             pass
         self.progressbar.set_text("%d of %d" % (self.sortedItems, self.totalItems))
+
         self.sortLabel.set_text(str(self.photoSortingBackend.CURRENT_BUCKET.year))
         self.helpLabel.set_text(
            "Keyboard Commands:\n" +
@@ -506,7 +510,11 @@ class PhotoSorterGui(object):
            " U: undo last sort\n" +
            ""
         )
-        self.window.resize(1, 1)
+        
+        if self.maximize:
+            self.window.maximize()
+        else:
+            self.window.resize(1, 1)
 
 
     def keyboard_command(self, widget, event):
@@ -579,10 +587,6 @@ class PhotoSorterGui(object):
                 # modify internal state variable... shhhh
                 self.photoSortingBackend._RESTART_PHOTO_GENERATOR = True
 
-            # resize window if necessary
-            if type(widget) == gtk.Window:
-                pass
-
         # usually happens when chr() is not in range(256), a.k.a., pressing
         # shift or ctrl key
         except ValueError:
@@ -595,6 +599,10 @@ class PhotoSorterGui(object):
 
 
 if __name__ == "__main__":
-    g = PhotoSorterGui()
+    maximize = False
+    if "-m" in sys.argv[1:]:
+        maximize = True
+
+    g = PhotoSorterGui(maximize=maximize)
     g.main()
 
