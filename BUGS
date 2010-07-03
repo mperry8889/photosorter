@@ -1,0 +1,12 @@
+Known bugs:
+
+- When using fancy features like "undo", the progress bar can get messed up if you "undo" more than once.
+
+- Pressing Z, causing all unknown photos to go to unsorted state, causes the progress bar to become insane.
+
+- No way to force instant transition of buckets, either forward or backwards.  Must restart program to go backwards.
+
+- Getting the "you are done" image doesn't necessarily mean you're done; there may be unsorted images in a previous bucket, if you've pressed a button like Z.  You must restart the program to go back to the previous buckets.
+
+
+
