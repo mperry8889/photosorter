@@ -3,8 +3,6 @@
 
 import sys
 import os
-import gtk
-import pango
 from PIL import Image as PILImage
 import pickle
 from copy import copy
@@ -600,6 +598,8 @@ class PhotoSorterGui(object):
 
 
 if __name__ == "__main__":
+    import gtk
+    import pango
     maximize = False
     if "-m" in sys.argv[1:]:
         maximize = True
